@@ -1,0 +1,83 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\JobApplication;
+use App\Models\ServiceRequest;
+use Illuminate\Http\Request;
+
+class ApplicantDashboardController extends Controller
+{
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        $specialties = $user->specialties ?? [];
+
+        $completedJobs = JobApplication::where('applicant_id', $user->id)
+            ->where('status', 'accepted')
+            ->whereHas('serviceRequest', fn($q) => $q->where('status', 'completed'))
+            ->count();
+
+        // Jobs this staff has accepted but client hasn't selected anyone yet
+        $pendingOffers = JobApplication::where('applicant_id', $user->id)
+            ->where('status', 'pending')
+            ->count();
+
+        $verification = [
+            ['key' => 'profile_complete', 'label' => 'Profile Complete',     'verified' => (bool) $user->form_completed],
+            ['key' => 'right_to_work',    'label' => 'Right to Work',        'verified' => $user->right_to_work_status === 'verified'],
+            ['key' => 'dbs_check',        'label' => 'DBS Check',            'verified' => $user->dbs_check_status === 'clear'],
+            ['key' => 'id_document',      'label' => 'ID Document Uploaded', 'verified' => (bool) $user->id_document_path],
+        ];
+
+        // Jobs already responded to — excluded from new matches
+        $respondedIds = JobApplication::where('applicant_id', $user->id)
+            ->pluck('service_request_id')
+            ->toArray();
+
+        $jobMatches = ServiceRequest::where('status', 'open')
+            ->where('applicant_type', $user->applicant_type)
+            ->whereNotIn('id', $respondedIds)
+            ->where(function ($q) use ($specialties) {
+                foreach ($specialties as $specialty) {
+                    $q->orWhereJsonContains('service_types', $specialty);
+                }
+            })
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get()
+            ->map(fn($j) => [
+                'id'       => $j->id,
+                'service'  => $j->servicesSummary(),
+                'area'     => $j->city . ', ' . $j->postcode,
+                'schedule' => $j->package_name ?? 'Flexible',
+                'pay'      => $j->pay_rate,
+            ]);
+
+        // Jobs this staff has accepted (pending = waiting for client; accepted = confirmed; rejected = not selected)
+        $myApplications = JobApplication::where('applicant_id', $user->id)
+            ->whereIn('status', ['pending', 'accepted', 'rejected'])
+            ->with('serviceRequest:id,service_types,package_name,pay_rate,status,city,postcode,start_date')
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get()
+            ->map(fn($a) => [
+                'id'         => $a->id,
+                'status'     => $a->status,
+                'service'    => $a->serviceRequest->servicesSummary(),
+                'area'       => $a->serviceRequest->city . ', ' . $a->serviceRequest->postcode,
+                'pay'        => $a->serviceRequest->pay_rate,
+                'start_date' => $a->serviceRequest->start_date?->toDateString(),
+                'job_status' => $a->serviceRequest->status,
+            ]);
+
+        return response()->json([
+            'stats'           => ['jobs_completed' => $completedJobs, 'rating' => null, 'pending_offers' => $pendingOffers],
+            'is_available'    => (bool) $user->is_available,
+            'verification'    => $verification,
+            'job_matches'     => $user->is_available ? $jobMatches : [],
+            'my_applications' => $myApplications,
+        ]);
+    }
+}
