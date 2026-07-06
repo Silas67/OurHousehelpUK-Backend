@@ -18,7 +18,6 @@ RUN composer install --no-dev --optimize-autoloader \
     && chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# Write vhost with hardcoded document root — no variable expansion issues
 RUN printf '<VirtualHost *:80>\n\
     DocumentRoot /var/www/html/public\n\
     <Directory /var/www/html/public>\n\
@@ -26,8 +25,8 @@ RUN printf '<VirtualHost *:80>\n\
         Require all granted\n\
         Options -Indexes\n\
     </Directory>\n\
-    ErrorLog ${APACHE_LOG_DIR}/error.log\n\
-    CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
+    ErrorLog /proc/self/fd/2\n\
+    CustomLog /proc/self/fd/1 combined\n\
 </VirtualHost>\n' > /etc/apache2/sites-available/000-default.conf
 
 COPY start.sh /start.sh
