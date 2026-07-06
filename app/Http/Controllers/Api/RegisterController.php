@@ -41,32 +41,12 @@ class RegisterController extends Controller
     public function applicant(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => ['required', 'string', 'max:255'],
-            'middle_name' => ['nullable', 'string', 'max:255'],
+            'name'      => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'phone' => ['required', 'string', 'max:20', 'unique:users'],
-            'applicant_type' => ['required', 'string', 'in:semi-live-in,live-out'],
-            'gender' => ['nullable', 'string', 'in:male,female,other,prefer_not_to_say'],
-            'dob' => ['required', 'date', 'before_or_equal:'.now()->subYears(18)->format('Y-m-d')],
-
-            'address_line_1' => ['required', 'string', 'max:255'],
-            'address_line_2' => ['nullable', 'string', 'max:255'],
-            'city' => ['required', 'string', 'max:255'],
-            'county' => ['nullable', 'string', 'max:255'],
-            'postcode' => ['required', 'string', 'max:10', 'regex:/^[A-Za-z]{1,2}\d[A-Za-z\d]?\s*\d[A-Za-z]{2}$/'],
-
-            'bio' => ['required', 'string'],
-            'years_of_experience' => ['required', 'string', 'max:50'],
-            'specialties' => ['required', 'array', 'min:1'],
-            'profile_photo' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
-            'id_document' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:4096'],
-
-            'ni_number' => ['required', 'string', 'max:13', 'unique:users,ni_number', 'regex:/^[A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z]\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D]$/i'],
-            'right_to_work_document_type' => ['required', 'string', 'in:passport,brp,share_code,visa'],
-
-            'terms_accepted' => ['required', 'accepted'],
+            'email'     => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'phone'     => ['required', 'string', 'max:20', 'unique:users'],
+            'password'  => ['required', 'string', 'min:8', 'confirmed'],
+            'cv'        => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
         ]);
 
         if ($validator->fails()) {
@@ -78,41 +58,24 @@ class RegisterController extends Controller
         DB::beginTransaction();
 
         try {
-            $profilePhotoPath = $request->file('profile_photo')->store('profile_photos', 'public');
-            $idDocumentPath = $request->file('id_document')->store('id_documents', 'public');
+            $cvPath = $request->file('cv')->store('cvs', 'public');
 
             $user = User::create([
-                'name' => $validated['name'],
-                'middle_name' => $validated['middle_name'] ?? null,
-                'last_name' => $validated['last_name'],
-                'email' => $validated['email'],
-                'password' => bcrypt($validated['password']),
-                'phone' => $validated['phone'],
-                'account_type' => 'applicant',
-                'applicant_type' => $validated['applicant_type'],
-                'gender' => $validated['gender'] ?? null,
-                'dob' => $validated['dob'],
-                'profile_photo_path' => $profilePhotoPath,
-                'address_line_1' => $validated['address_line_1'],
-                'address_line_2' => $validated['address_line_2'] ?? null,
-                'city' => $validated['city'],
-                'county' => $validated['county'] ?? null,
-                'postcode' => $validated['postcode'],
-                'bio' => $validated['bio'],
-                'years_of_experience' => $validated['years_of_experience'],
-                'specialties' => $validated['specialties'],
-                'id_document_path' => $idDocumentPath,
-                'ni_number' => strtoupper(str_replace(' ', '', $validated['ni_number'])),
-                'right_to_work_document_type' => $validated['right_to_work_document_type'],
-                'terms_accepted' => true,
-                'form_completed' => true,
+                'name'               => $validated['name'],
+                'last_name'          => $validated['last_name'],
+                'email'              => $validated['email'],
+                'phone'              => $validated['phone'],
+                'password'           => bcrypt($validated['password']),
+                'account_type'       => 'applicant',
+                'cv_path'            => $cvPath,
+                'application_status' => 'pending',
+                'terms_accepted'     => true,
             ]);
 
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-
-            return response()->json(['message' => 'There was an error submitting the form. Please try again.'], 500);
+            return response()->json(['message' => 'Registration failed. Please try again.'], 500);
         }
 
         $token = $user->createToken('mobile-app')->plainTextToken;

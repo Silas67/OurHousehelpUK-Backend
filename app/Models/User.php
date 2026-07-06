@@ -45,6 +45,8 @@ class User extends Authenticatable
         'years_of_experience',
         'specialties',
         'id_document_path',
+        'cv_path',
+        'application_status',
 
         'right_to_work_status',
         'right_to_work_document_type',
