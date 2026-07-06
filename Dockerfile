@@ -1,8 +1,4 @@
-FROM php:8.2-apache
-
-RUN a2dismod mpm_event 2>/dev/null || true \
-    && a2dismod mpm_worker 2>/dev/null || true \
-    && a2enmod mpm_prefork rewrite headers
+FROM php:8.2-cli
 
 RUN apt-get update && apt-get install -y \
     libpng-dev libjpeg-dev libfreetype6-dev \
@@ -17,21 +13,6 @@ WORKDIR /var/www/html
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader \
-    && chmod -R 775 storage bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache
 
-RUN printf '<VirtualHost *:80>\n\
-    DocumentRoot /var/www/html/public\n\
-    <Directory /var/www/html/public>\n\
-        AllowOverride All\n\
-        Require all granted\n\
-        Options -Indexes\n\
-    </Directory>\n\
-    ErrorLog /proc/self/fd/2\n\
-    CustomLog /proc/self/fd/1 combined\n\
-</VirtualHost>\n' > /etc/apache2/sites-available/000-default.conf
-
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
-CMD ["/start.sh"]
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
