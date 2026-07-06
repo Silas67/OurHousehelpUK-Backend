@@ -45,6 +45,7 @@ class RegisterController extends Controller
             'last_name' => ['required', 'string', 'max:255'],
             'email'     => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'phone'     => ['required', 'string', 'max:20', 'unique:users'],
+            'postcode'  => ['required', 'string', 'max:10'],
             'password'  => ['required', 'string', 'min:8', 'confirmed'],
             'cv'        => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
         ]);
@@ -67,6 +68,7 @@ class RegisterController extends Controller
                 'phone'              => $validated['phone'],
                 'password'           => bcrypt($validated['password']),
                 'account_type'       => 'applicant',
+                'postcode'           => strtoupper($validated['postcode']),
                 'cv_path'            => $cvPath,
                 'application_status' => 'pending',
                 'terms_accepted'     => true,
