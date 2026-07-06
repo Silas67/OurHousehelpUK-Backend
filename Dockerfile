@@ -1,6 +1,7 @@
 FROM php:8.2-apache
 
-RUN a2dismod mpm_event mpm_worker 2>/dev/null || true \
+RUN a2dismod mpm_event 2>/dev/null || true \
+    && a2dismod mpm_worker 2>/dev/null || true \
     && a2enmod mpm_prefork rewrite headers
 
 RUN apt-get update && apt-get install -y \
