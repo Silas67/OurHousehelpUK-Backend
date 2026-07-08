@@ -19,6 +19,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/user', fn(Request $request) => $request->user())->middleware('auth:sanctum');
 Route::get('/health', fn() => response()->json(['status' => 'ok']));
 
+// Stripe webhook — must be public and receive raw body (no Sanctum, no CSRF)
+Route::post('/stripe/webhook', [PaymentController::class, 'webhook']);
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/register/client', [RegisterController::class, 'client'])->middleware('throttle:login');
 Route::post('/register/applicant', [RegisterController::class, 'applicant'])->middleware('throttle:login');

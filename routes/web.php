@@ -5,6 +5,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => view('welcome'));
 
+Route::get('/payment/success', fn() => view('payment.success'));
+Route::get('/payment/cancel',  fn() => view('payment.cancel'));
+
 // Admin auth (no middleware — must be public)
 Route::get('/admin/login',  [AdminController::class, 'loginForm'])->name('admin.login');
 Route::post('/admin/login', [AdminController::class, 'login'])->name('admin.login.post');

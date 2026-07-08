@@ -10,15 +10,20 @@ use App\Notifications\JobFilledNotification;
 use App\Notifications\StaffConfirmedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Stripe\Exception\SignatureVerificationException;
+use Stripe\StripeClient;
+use Stripe\Webhook;
 
 class PaymentController extends Controller
 {
+    private function stripe(): StripeClient
+    {
+        return new StripeClient(config('services.stripe.secret'));
+    }
+
     /**
      * POST /payments/checkout
-     *
-     * Records payment and confirms the booking in one atomic transaction.
-     * Stripe integration ready: swap status 'paid' for 'pending' and add
-     * stripe_payment_intent_id once Stripe keys are live.
+     * Creates a Stripe Checkout Session and returns the URL for the app to open in-browser.
      */
     public function checkout(Request $request)
     {
@@ -46,49 +51,126 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        // Derive amount from the cost breakdown saved on the booking
         $breakdown   = $booking->cost_breakdown ?? [];
         $amountPence = isset($breakdown['client_total'])
             ? (int) round((float) $breakdown['client_total'] * 100)
             : 0;
 
-        DB::transaction(function () use ($booking, $application, $request, $amountPence) {
-            Payment::create([
-                'booking_id'   => $booking->id,
-                'client_id'    => $request->user()->id,
-                'amount_pence' => $amountPence,
-                'currency'     => 'gbp',
-                'status'       => 'paid',
-            ]);
+        if ($amountPence <= 0) {
+            return response()->json(['message' => 'Booking has no payable amount.'], 422);
+        }
 
-            $application->update(['status' => 'accepted']);
-            $booking->applications()
-                ->where('applicant_id', '!=', $request->applicant_id)
-                ->update(['status' => 'rejected']);
-            $booking->update(['status' => 'confirmed', 'applicant_id' => $request->applicant_id]);
+        $stripe  = $this->stripe();
+        $baseUrl = rtrim(config('app.url'), '/');
 
-            $selectedStaff = User::find($request->applicant_id);
-            if ($selectedStaff) {
-                $selectedStaff->notify(new StaffConfirmedNotification($booking));
-            }
+        $session = $stripe->checkout->sessions->create([
+            'payment_method_types' => ['card'],
+            'mode'                 => 'payment',
+            'line_items'           => [[
+                'price_data' => [
+                    'currency'     => 'gbp',
+                    'unit_amount'  => $amountPence,
+                    'product_data' => [
+                        'name'        => 'OurHouseHelp Booking',
+                        'description' => $booking->servicesSummary() . ' — ' . ($booking->package_name ?? 'One-time booking'),
+                    ],
+                ],
+                'quantity' => 1,
+            ]],
+            'success_url' => $baseUrl . '/payment/success?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url'  => $baseUrl . '/payment/cancel',
+            'metadata'    => [
+                'booking_id'   => (string) $booking->id,
+                'applicant_id' => (string) $request->applicant_id,
+                'client_id'    => (string) $request->user()->id,
+            ],
+        ]);
 
-            $rejectedIds = $booking->applications()
-                ->where('applicant_id', '!=', $request->applicant_id)
-                ->pluck('applicant_id');
-            User::whereIn('id', $rejectedIds)->each(
-                fn($staff) => $staff->notify(new JobFilledNotification($booking))
-            );
-        });
+        Payment::create([
+            'booking_id'               => $booking->id,
+            'client_id'                => $request->user()->id,
+            'amount_pence'             => $amountPence,
+            'currency'                 => 'gbp',
+            'status'                   => 'pending',
+            'stripe_payment_intent_id' => $session->id,
+        ]);
 
         return response()->json([
-            'message' => 'Payment recorded and booking confirmed.',
-            'booking' => $booking->fresh(),
+            'checkout_url' => $session->url,
+            'session_id'   => $session->id,
         ]);
     }
 
     /**
+     * POST /stripe/webhook
+     * Stripe calls this when checkout.session.completed fires.
+     * No Sanctum auth — verified by Stripe signature.
+     */
+    public function webhook(Request $request)
+    {
+        $payload   = $request->getContent();
+        $sigHeader = $request->header('Stripe-Signature');
+        $secret    = config('services.stripe.webhook_secret');
+
+        try {
+            $event = Webhook::constructEvent($payload, $sigHeader, $secret);
+        } catch (SignatureVerificationException $e) {
+            return response()->json(['message' => 'Invalid signature.'], 400);
+        }
+
+        if ($event->type === 'checkout.session.completed') {
+            $session     = $event->data->object;
+            $meta        = $session->metadata;
+            $bookingId   = $meta->booking_id ?? null;
+            $applicantId = $meta->applicant_id ?? null;
+
+            if (!$bookingId || !$applicantId) {
+                return response()->json(['message' => 'ok'], 200);
+            }
+
+            $booking = ServiceRequest::find($bookingId);
+            if (!$booking || !in_array($booking->status, ['open', 'matched'])) {
+                return response()->json(['message' => 'ok'], 200);
+            }
+
+            $application = $booking->applications()
+                ->where('applicant_id', $applicantId)
+                ->where('status', 'pending')
+                ->first();
+
+            if (!$application) {
+                return response()->json(['message' => 'ok'], 200);
+            }
+
+            DB::transaction(function () use ($booking, $application, $applicantId, $session) {
+                Payment::where('stripe_payment_intent_id', $session->id)
+                    ->update(['status' => 'paid']);
+
+                $application->update(['status' => 'accepted']);
+                $booking->applications()
+                    ->where('applicant_id', '!=', $applicantId)
+                    ->update(['status' => 'rejected']);
+                $booking->update(['status' => 'confirmed', 'applicant_id' => $applicantId]);
+
+                $selectedStaff = User::find($applicantId);
+                if ($selectedStaff) {
+                    $selectedStaff->notify(new StaffConfirmedNotification($booking));
+                }
+
+                $rejectedIds = $booking->applications()
+                    ->where('applicant_id', '!=', $applicantId)
+                    ->pluck('applicant_id');
+                User::whereIn('id', $rejectedIds)->each(
+                    fn($staff) => $staff->notify(new JobFilledNotification($booking))
+                );
+            });
+        }
+
+        return response()->json(['message' => 'ok']);
+    }
+
+    /**
      * GET /payments/booking/{booking}
-     * Returns payment record for a booking (client's own only).
      */
     public function forBooking(Request $request, ServiceRequest $booking)
     {
@@ -107,12 +189,12 @@ class PaymentController extends Controller
 
         return response()->json([
             'payment' => [
-                'id'              => $payment->id,
-                'amount_pence'    => $payment->amount_pence,
-                'amount_formatted'=> $payment->amount_formatted,
-                'currency'        => $payment->currency,
-                'status'          => $payment->status,
-                'created_at'      => $payment->created_at->toDateTimeString(),
+                'id'               => $payment->id,
+                'amount_pence'     => $payment->amount_pence,
+                'amount_formatted' => $payment->amount_formatted,
+                'currency'         => $payment->currency,
+                'status'           => $payment->status,
+                'created_at'       => $payment->created_at->toDateTimeString(),
             ],
         ]);
     }
