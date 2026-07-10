@@ -59,7 +59,7 @@ class RegisterController extends Controller
         DB::beginTransaction();
 
         try {
-            $cvPath = $request->file('cv')->store('cvs', 'public');
+            $cvPath = $request->file('cv')->store('cvs');
 
             $user = User::create([
                 'name'               => $validated['name'],
