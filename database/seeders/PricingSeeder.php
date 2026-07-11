@@ -11,18 +11,18 @@ class PricingSeeder extends Seeder
     {
         // Monthly cleaning cost based on UK hourly rate (£13/hr, 1 visit/week)
         $apartmentTypes = [
-            ['name' => 'Studio / 1 Room', 'cost' => 110.00],  // ~2h/visit
-            ['name' => '1 Bedroom',       'cost' => 140.00],  // ~2.5h/visit
-            ['name' => '2 Bedrooms',      'cost' => 170.00],  // ~3h/visit
-            ['name' => '3 Bedrooms',      'cost' => 225.00],  // ~4h/visit
-            ['name' => '4 Bedrooms',      'cost' => 280.00],  // ~5h/visit
-            ['name' => '5+ Bedrooms',     'cost' => 395.00],  // ~7h/visit
+            ['name' => 'Studio / 1 Room', 'cost' => 110.00, 'hourly_rate' => 13.00],
+            ['name' => '1 Bedroom',       'cost' => 140.00, 'hourly_rate' => 13.00],
+            ['name' => '2 Bedrooms',      'cost' => 170.00, 'hourly_rate' => 13.00],
+            ['name' => '3 Bedrooms',      'cost' => 225.00, 'hourly_rate' => 13.00],
+            ['name' => '4 Bedrooms',      'cost' => 280.00, 'hourly_rate' => 13.00],
+            ['name' => '5+ Bedrooms',     'cost' => 395.00, 'hourly_rate' => 13.00],
         ];
 
         foreach ($apartmentTypes as $data) {
             DB::table('apartment_types')->updateOrInsert(
                 ['name' => $data['name']],
-                ['cost' => $data['cost']]
+                ['cost' => $data['cost'], 'hourly_rate' => $data['hourly_rate']]
             );
         }
 
