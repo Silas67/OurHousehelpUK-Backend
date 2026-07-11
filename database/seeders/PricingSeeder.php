@@ -47,5 +47,29 @@ class PricingSeeder extends Seeder
             ->update(['slug' => 'errands', 'service_name' => 'Errands']);
 
         DB::table('extra_service_costs')->update(['cost' => 80.00]);
+
+        $managementPlans = [
+            [
+                'name'             => 'Client Managed',
+                'slug'             => 'client-managed',
+                'description'      => 'You manage the relationship directly with your staff. No platform fee.',
+                'platform_markup'  => 0.00,
+                'is_active'        => true,
+            ],
+            [
+                'name'             => 'Company Managed',
+                'slug'             => 'company-managed',
+                'description'      => 'We handle payroll, compliance, and replacements. 20% platform fee applies.',
+                'platform_markup'  => 20.00,
+                'is_active'        => true,
+            ],
+        ];
+
+        foreach ($managementPlans as $data) {
+            DB::table('management_plans')->updateOrInsert(
+                ['slug' => $data['slug']],
+                $data
+            );
+        }
     }
 }
