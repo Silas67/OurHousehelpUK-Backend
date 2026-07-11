@@ -9,13 +9,14 @@ class PricingSeeder extends Seeder
 {
     public function run(): void
     {
+        // Monthly cleaning cost based on UK hourly rate (£13/hr, 1 visit/week)
         $apartmentTypes = [
-            ['name' => 'Studio / 1 Room', 'cost' => 200.00],
-            ['name' => '1 Bedroom',       'cost' => 250.00],
-            ['name' => '2 Bedrooms',      'cost' => 320.00],
-            ['name' => '3 Bedrooms',      'cost' => 420.00],
-            ['name' => '4 Bedrooms',      'cost' => 500.00],
-            ['name' => '5+ Bedrooms',     'cost' => 600.00],
+            ['name' => 'Studio / 1 Room', 'cost' => 110.00],  // ~2h/visit
+            ['name' => '1 Bedroom',       'cost' => 140.00],  // ~2.5h/visit
+            ['name' => '2 Bedrooms',      'cost' => 170.00],  // ~3h/visit
+            ['name' => '3 Bedrooms',      'cost' => 225.00],  // ~4h/visit
+            ['name' => '4 Bedrooms',      'cost' => 280.00],  // ~5h/visit
+            ['name' => '5+ Bedrooms',     'cost' => 395.00],  // ~7h/visit
         ];
 
         foreach ($apartmentTypes as $data) {
@@ -25,13 +26,14 @@ class PricingSeeder extends Seeder
             );
         }
 
+        // Monthly base cost per service based on UK hourly staff rates
         $services = [
-            ['slug' => 'cleaning',     'service_name' => 'Cleaning',    'base_cost' => 0.00],
-            ['slug' => 'cooking',      'service_name' => 'Cooking',      'base_cost' => 380.00],
-            ['slug' => 'laundry',      'service_name' => 'Laundry',      'base_cost' => 180.00],
-            ['slug' => 'childcare',    'service_name' => 'Childcare',    'base_cost' => 650.00],
-            ['slug' => 'elderly_care', 'service_name' => 'Elderly Care', 'base_cost' => 550.00],
-            ['slug' => 'errands',      'service_name' => 'Errands',      'base_cost' => 0.00],
+            ['slug' => 'cleaning',     'service_name' => 'Cleaning',    'base_cost' => 0.00],    // apartment-based
+            ['slug' => 'cooking',      'service_name' => 'Cooking',      'base_cost' => 280.00], // £13/hr × 1h/day × 5d × 4.3wk
+            ['slug' => 'laundry',      'service_name' => 'Laundry',      'base_cost' => 110.00], // £12.50/hr × 2h/wk × 4.3wk
+            ['slug' => 'childcare',    'service_name' => 'Childcare',    'base_cost' => 480.00], // £14/hr × 8h/wk × 4.3wk
+            ['slug' => 'elderly_care', 'service_name' => 'Elderly Care', 'base_cost' => 480.00], // £14/hr × 8h/wk × 4.3wk
+            ['slug' => 'errands',      'service_name' => 'Errands',      'base_cost' => 0.00],    // flat PSS add-on
         ];
 
         foreach ($services as $data) {

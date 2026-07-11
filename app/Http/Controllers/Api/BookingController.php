@@ -43,7 +43,7 @@ class BookingController extends Controller
             'service_types'      => ['required', 'array', 'min:1'],
             'service_types.*'    => ['string', 'in:cleaning,cooking,childcare,elderly_care,laundry,errands,pet_care'],
             'applicant_type'     => ['required', 'string', 'in:semi-live-in,live-out'],
-            'management_plan'    => ['required', 'string', 'in:client-managed,company-managed'],
+            'management_plan'    => ['nullable', 'string', 'in:client-managed,company-managed'],
             'package_id'         => ['required_unless:duration_weeks,1', 'nullable', 'integer', 'exists:packages,id'],
             'apartment_type_id'  => ['nullable', 'integer', 'exists:apartment_types,id'],
             'address_line_1'     => ['required', 'string', 'max:255'],
@@ -63,12 +63,13 @@ class BookingController extends Controller
         }
 
         // Calculate cost using the service
+        $managementPlan = $request->management_plan ?? 'company-managed';
         $costService = new BookingCostService();
         $pkg         = $request->package_id ? Package::find($request->package_id) : null;
         $costResult  = $costService->calculate(
             $request->service_types,
             $request->package_id,
-            $request->management_plan,
+            $managementPlan,
             $request->duration_weeks,
             $request->apartment_type_id
         );
@@ -81,7 +82,7 @@ class BookingController extends Controller
             'client_id'          => $request->user()->id,
             'service_types'      => $request->service_types,
             'applicant_type'     => $request->applicant_type,
-            'management_plan'    => $request->management_plan,
+            'management_plan'    => $managementPlan,
             'apartment_type_id'  => $request->apartment_type_id,
             'feature_cost'       => $costResult['apartment_cost'],
             'address_line_1'     => $request->address_line_1,

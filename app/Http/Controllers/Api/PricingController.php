@@ -28,9 +28,9 @@ class PricingController extends Controller
     {
         $request->validate([
             'service_slugs'      => ['required', 'array', 'min:1'],
-            'service_slugs.*'    => ['string', 'in:cleaning,cooking,childcare,elderly_care,laundry,pet_care'],
+            'service_slugs.*'    => ['string', 'in:cleaning,cooking,childcare,elderly_care,laundry,errands,pet_care'],
             'package_id'         => ['nullable', 'integer', 'exists:packages,id'],
-            'management_plan'    => ['required', 'string', 'in:client-managed,company-managed'],
+            'management_plan'    => ['nullable', 'string', 'in:client-managed,company-managed'],
             'duration_weeks'     => ['required', 'integer', 'in:1,4,8,12'],
             'apartment_type_id'  => ['nullable', 'integer', 'exists:apartment_types,id'],
         ]);
@@ -38,7 +38,7 @@ class PricingController extends Controller
         $result = $this->costService->calculate(
             $request->service_slugs,
             $request->package_id,
-            $request->management_plan,
+            $request->management_plan ?? 'company-managed',
             $request->duration_weeks,
             $request->apartment_type_id
         );
