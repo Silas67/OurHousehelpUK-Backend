@@ -41,7 +41,7 @@ class BookingController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'service_types'      => ['required', 'array', 'min:1'],
-            'service_types.*'    => ['string', 'in:cleaning,cooking,childcare,elderly_care,laundry,pet_care'],
+            'service_types.*'    => ['string', 'in:cleaning,cooking,childcare,elderly_care,laundry,errands,pet_care'],
             'applicant_type'     => ['required', 'string', 'in:semi-live-in,live-out'],
             'management_plan'    => ['required', 'string', 'in:client-managed,company-managed'],
             'package_id'         => ['required_unless:duration_weeks,1', 'nullable', 'integer', 'exists:packages,id'],

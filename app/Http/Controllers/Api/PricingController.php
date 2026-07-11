@@ -18,7 +18,7 @@ class PricingController extends Controller
     {
         return response()->json([
             'packages'         => Package::active()->get(['id', 'name', 'days_per_week', 'cost', 'description']),
-            'apartment_types'  => ApartmentType::orderBy('sort_order')->get(['id', 'name', 'cost']),
+            'apartment_types'  => ApartmentType::orderBy('id')->get(['id', 'name', 'cost']),
             'management_plans' => ManagementPlan::where('is_active', true)->get(['id', 'name', 'slug', 'description', 'platform_markup']),
         ]);
     }
