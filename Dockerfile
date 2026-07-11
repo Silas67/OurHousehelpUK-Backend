@@ -15,4 +15,7 @@ COPY . .
 RUN composer update --no-dev --optimize-autoloader --no-interaction \
     && chmod -R 775 storage bootstrap/cache
 
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
