@@ -9,6 +9,28 @@ use Illuminate\Support\Facades\Storage;
 
 class StaffController extends Controller
 {
+    public function index(Request $request)
+    {
+        $staff = User::where('account_type', 'applicant')
+            ->where('form_completed', true)
+            ->select(['id', 'name', 'last_name', 'bio', 'years_of_experience', 'specialties', 'city', 'profile_photo_path', 'applicant_type', 'dbs_check_status', 'right_to_work_status'])
+            ->get()
+            ->map(fn($u) => [
+                'id'                  => $u->id,
+                'name'                => trim($u->name . ' ' . ($u->last_name ? substr($u->last_name, 0, 1) . '.' : '')),
+                'bio'                 => $u->bio,
+                'years_of_experience' => $u->years_of_experience,
+                'specialties'         => $u->specialties ?? [],
+                'city'                => $u->city,
+                'applicant_type'      => $u->applicant_type,
+                'dbs_verified'        => $u->dbs_check_status === 'clear',
+                'rtw_verified'        => $u->right_to_work_status === 'verified',
+                'profile_photo_url'   => $u->profile_photo_path ? url('storage/' . $u->profile_photo_path) : null,
+            ]);
+
+        return response()->json(['staff' => $staff]);
+    }
+
     public function show(Request $request, User $staff)
     {
         if ($staff->account_type !== 'applicant') {

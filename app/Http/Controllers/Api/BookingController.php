@@ -41,18 +41,22 @@ class BookingController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'service_types'      => ['required', 'array', 'min:1'],
-            'service_types.*'    => ['string', 'in:cleaning,cooking,childcare,elderly_care,laundry,errands,pet_care'],
+            'service_types.*'    => ['string', 'in:cleaning,deep_cleaning,cooking,childcare,elderly_care,laundry,ironing,errands,window_cleaning,pet_care'],
             'applicant_type'     => ['required', 'string', 'in:semi-live-in,live-out'],
             'management_plan'    => ['nullable', 'string', 'in:client-managed,company-managed'],
-            'package_id'         => ['required_unless:duration_weeks,1', 'nullable', 'integer', 'exists:packages,id'],
+            'package_id'         => ['nullable', 'integer', 'exists:packages,id'],
             'apartment_type_id'  => ['nullable', 'integer', 'exists:apartment_types,id'],
+            'bedrooms'           => ['nullable', 'integer', 'min:0', 'max:10'],
+            'bathrooms'          => ['nullable', 'integer', 'min:0', 'max:10'],
+            'kitchens'           => ['nullable', 'integer', 'min:0', 'max:10'],
+            'hours_per_session'  => ['nullable', 'integer', 'min:1', 'max:12'],
             'address_line_1'     => ['required', 'string', 'max:255'],
             'address_line_2'     => ['nullable', 'string', 'max:255'],
             'city'               => ['required', 'string', 'max:255'],
             'postcode'           => ['required', 'string', 'max:10'],
             'start_date'         => ['required', 'date', 'after_or_equal:today'],
             'end_date'           => ['nullable', 'date', 'after:start_date'],
-            'duration_weeks'     => ['required', 'integer', 'in:1,4,8,12'],
+            'duration_weeks'     => ['required', 'integer', 'in:1,2,3,4,8,12'],
             'service_days'       => ['nullable', 'string', 'max:255'],
             'working_hour_start' => ['nullable', 'string', 'max:10'],
             'working_hour_end'   => ['nullable', 'string', 'max:10'],
@@ -84,6 +88,10 @@ class BookingController extends Controller
             'applicant_type'     => $request->applicant_type,
             'management_plan'    => $managementPlan,
             'apartment_type_id'  => $request->apartment_type_id,
+            'bedrooms'           => $request->bedrooms ?? 0,
+            'bathrooms'          => $request->bathrooms ?? 0,
+            'kitchens'           => $request->kitchens ?? 1,
+            'hours_per_session'  => $request->applicant_type === 'semi-live-in' ? 10 : ($request->hours_per_session ?? 0),
             'feature_cost'       => $costResult['apartment_cost'],
             'address_line_1'     => $request->address_line_1,
             'address_line_2'     => $request->address_line_2,
@@ -202,5 +210,27 @@ class BookingController extends Controller
         }
         $booking->update(['status' => 'completed']);
         return response()->json(['message' => 'Booking marked as completed.', 'booking' => $booking->fresh()]);
+    }
+
+    public function invite(Request $request, ServiceRequest $booking, User $staff)
+    {
+        if ($booking->client_id !== $request->user()->id) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        if ($staff->account_type !== 'applicant') {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        if ($booking->applications()->where('applicant_id', $staff->id)->exists()) {
+            return response()->json(['message' => 'Already sent.'], 409);
+        }
+
+        $booking->applications()->create([
+            'applicant_id' => $staff->id,
+            'status'       => 'invited',
+        ]);
+
+        return response()->json(['message' => 'Request sent.']);
     }
 }
