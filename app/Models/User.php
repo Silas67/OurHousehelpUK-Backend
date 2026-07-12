@@ -56,6 +56,8 @@ class User extends Authenticatable
         'dbs_check_status',
         'dbs_certificate_number',
         'dbs_check_date',
+        'dbs_certificate_path',
+        'stripe_customer_id',
 
         'form_completed',
         'terms_accepted',

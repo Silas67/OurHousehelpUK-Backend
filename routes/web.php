@@ -5,8 +5,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => view('welcome'));
 
-Route::get('/payment/success', fn() => view('payment.success'));
-Route::get('/payment/cancel',  fn() => view('payment.cancel'));
+Route::get('/payment/success',    fn() => view('payment.success'));
+Route::get('/payment/card-saved', fn() => view('payment.card-saved'));
+Route::get('/payment/cancel',     fn() => view('payment.cancel'));
 
 // Admin auth (no middleware — must be public)
 Route::get('/admin/login',  [AdminController::class, 'loginForm'])->name('admin.login');

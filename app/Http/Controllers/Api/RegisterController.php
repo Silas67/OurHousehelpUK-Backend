@@ -47,7 +47,8 @@ class RegisterController extends Controller
             'phone'     => ['required', 'string', 'max:20', 'unique:users'],
             'postcode'  => ['required', 'string', 'max:10'],
             'password'  => ['required', 'string', 'min:8', 'confirmed'],
-            'cv'        => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
+            'cv'              => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
+            'dbs_certificate' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png', 'max:10240'],
         ]);
 
         if ($validator->fails()) {
@@ -59,19 +60,24 @@ class RegisterController extends Controller
         DB::beginTransaction();
 
         try {
-            $cvPath = $request->file('cv')->store('cvs');
+            $cvPath  = $request->file('cv')->store('cvs');
+            $dbsPath = $request->hasFile('dbs_certificate')
+                ? $request->file('dbs_certificate')->store('dbs_certificates')
+                : null;
 
             $user = User::create([
-                'name'               => $validated['name'],
-                'last_name'          => $validated['last_name'],
-                'email'              => $validated['email'],
-                'phone'              => $validated['phone'],
-                'password'           => bcrypt($validated['password']),
-                'account_type'       => 'applicant',
-                'postcode'           => strtoupper($validated['postcode']),
-                'cv_path'            => $cvPath,
-                'application_status' => 'pending',
-                'terms_accepted'     => true,
+                'name'                => $validated['name'],
+                'last_name'           => $validated['last_name'],
+                'email'               => $validated['email'],
+                'phone'               => $validated['phone'],
+                'password'            => bcrypt($validated['password']),
+                'account_type'        => 'applicant',
+                'postcode'            => strtoupper($validated['postcode']),
+                'cv_path'             => $cvPath,
+                'dbs_certificate_path'=> $dbsPath,
+                'dbs_check_status'    => $dbsPath ? 'submitted' : 'pending',
+                'application_status'  => 'pending',
+                'terms_accepted'      => true,
             ]);
 
             DB::commit();

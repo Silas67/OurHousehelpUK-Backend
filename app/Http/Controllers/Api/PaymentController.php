@@ -22,6 +22,46 @@ class PaymentController extends Controller
     }
 
     /**
+     * POST /payments/setup
+     * Creates a Stripe Checkout Session in setup mode to save client's card.
+     * App opens the URL in browser; webhook stores the payment method when saved.
+     */
+    public function setup(Request $request)
+    {
+        $request->validate([
+            'booking_id' => ['required', 'integer', 'exists:service_requests,id'],
+        ]);
+
+        $booking = ServiceRequest::findOrFail($request->booking_id);
+        if ($booking->client_id !== $request->user()->id) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        $stripe  = $this->stripe();
+        $user    = $request->user();
+        $baseUrl = rtrim(config('app.url'), '/');
+
+        if (!$user->stripe_customer_id) {
+            $customer = $stripe->customers->create(['email' => $user->email, 'name' => $user->name]);
+            $user->update(['stripe_customer_id' => $customer->id]);
+        }
+
+        $session = $stripe->checkout->sessions->create([
+            'mode'        => 'setup',
+            'customer'    => $user->stripe_customer_id,
+            'currency'    => 'gbp',
+            'success_url' => $baseUrl . '/payment/card-saved?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url'  => $baseUrl . '/payment/cancel',
+            'metadata'    => [
+                'booking_id' => (string) $booking->id,
+                'client_id'  => (string) $user->id,
+            ],
+        ]);
+
+        return response()->json(['setup_url' => $session->url, 'session_id' => $session->id]);
+    }
+
+    /**
      * POST /payments/checkout
      * Creates a Stripe Checkout Session and returns the URL for the app to open in-browser.
      */
@@ -119,8 +159,27 @@ class PaymentController extends Controller
         }
 
         if ($event->type === 'checkout.session.completed') {
-            $session     = $event->data->object;
-            $meta        = $session->metadata;
+            $session = $event->data->object;
+            $meta    = $session->metadata;
+
+            // ── Setup mode: save the payment method on the booking ──────────
+            if ($session->mode === 'setup') {
+                $bookingId = $meta->booking_id ?? null;
+                if ($bookingId && $session->setup_intent) {
+                    $stripe      = $this->stripe();
+                    $setupIntent = $stripe->setupIntents->retrieve($session->setup_intent);
+                    $pmId        = $setupIntent->payment_method;
+
+                    if ($pmId) {
+                        // Attach to customer so off_session charges work
+                        $stripe->paymentMethods->attach($pmId, ['customer' => $session->customer]);
+                        ServiceRequest::where('id', $bookingId)->update(['stripe_payment_method_id' => $pmId]);
+                    }
+                }
+                return response()->json(['message' => 'ok']);
+            }
+
+            // ── Payment mode: existing checkout flow ────────────────────────
             $bookingId   = $meta->booking_id ?? null;
             $applicantId = $meta->applicant_id ?? null;
 

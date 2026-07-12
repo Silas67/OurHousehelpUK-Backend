@@ -31,6 +31,8 @@ class ServiceRequest extends Model
         'working_hour_end',
         'pay_rate',
         'cost_breakdown',
+        'stripe_payment_method_id',
+        'quoted_pence',
         'status',
         'applicant_id',
     ];

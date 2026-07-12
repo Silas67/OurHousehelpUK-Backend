@@ -26,22 +26,23 @@ class PricingSeeder extends Seeder
             );
         }
 
+        // hourly_rate = midpoint of the displayed £min–max/hr range
         $services = [
-            ['slug' => 'cleaning',        'service_name' => 'General Cleaning',  'base_cost' => 0.00],
-            ['slug' => 'deep_cleaning',   'service_name' => 'Deep Cleaning',     'base_cost' => 0.00],
-            ['slug' => 'laundry',         'service_name' => 'Laundry/Ironing',   'base_cost' => 0.00],
-            ['slug' => 'ironing',         'service_name' => 'Ironing',           'base_cost' => 0.00],
-            ['slug' => 'cooking',         'service_name' => 'Cooking/Meal Prep', 'base_cost' => 0.00],
-            ['slug' => 'childcare',       'service_name' => 'Childcare/Nanny',   'base_cost' => 0.00],
-            ['slug' => 'elderly_care',    'service_name' => 'Elderly Care',      'base_cost' => 0.00],
-            ['slug' => 'errands',         'service_name' => 'Errand Running',    'base_cost' => 0.00],
-            ['slug' => 'window_cleaning', 'service_name' => 'Window Cleaning',   'base_cost' => 0.00],
+            ['slug' => 'cleaning',        'service_name' => 'General Cleaning',  'base_cost' => 0.00, 'hourly_rate' => 14.00],
+            ['slug' => 'deep_cleaning',   'service_name' => 'Deep Cleaning',     'base_cost' => 0.00, 'hourly_rate' => 17.50],
+            ['slug' => 'laundry',         'service_name' => 'Laundry/Ironing',   'base_cost' => 0.00, 'hourly_rate' => 13.50],
+            ['slug' => 'ironing',         'service_name' => 'Ironing',           'base_cost' => 0.00, 'hourly_rate' => 13.50],
+            ['slug' => 'cooking',         'service_name' => 'Cooking/Meal Prep', 'base_cost' => 0.00, 'hourly_rate' => 16.00],
+            ['slug' => 'childcare',       'service_name' => 'Childcare/Nanny',   'base_cost' => 0.00, 'hourly_rate' => 15.00],
+            ['slug' => 'elderly_care',    'service_name' => 'Elderly Care',      'base_cost' => 0.00, 'hourly_rate' => 14.00],
+            ['slug' => 'errands',         'service_name' => 'Errand Running',    'base_cost' => 0.00, 'hourly_rate' => 13.00],
+            ['slug' => 'window_cleaning', 'service_name' => 'Window Cleaning',   'base_cost' => 0.00, 'hourly_rate' => 13.50],
         ];
 
         foreach ($services as $data) {
             DB::table('house_services')->updateOrInsert(
                 ['slug' => $data['slug']],
-                ['service_name' => $data['service_name'], 'base_cost' => $data['base_cost']]
+                ['service_name' => $data['service_name'], 'base_cost' => $data['base_cost'], 'hourly_rate' => $data['hourly_rate']]
             );
         }
 

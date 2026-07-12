@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\HouseService;
 use App\Models\Package;
+use App\Models\Payment;
 use App\Models\ServiceRequest;
 use App\Models\User;
 use App\Notifications\JobFilledNotification;
@@ -11,6 +13,7 @@ use App\Notifications\StaffConfirmedNotification;
 use App\Services\BookingCostService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Stripe\StripeClient;
 
 class BookingController extends Controller
 {
@@ -82,6 +85,14 @@ class BookingController extends Controller
             ? BookingCostService::format($costResult['staff_salary'])
             : null;
 
+        // Calculate per-session quoted amount for card charge on completion
+        $services   = HouseService::whereIn('slug', $request->service_types)->get();
+        $avgRate    = $services->isNotEmpty() ? $services->avg('hourly_rate') : 14.0;
+        $sessHours  = $request->applicant_type === 'semi-live-in' ? 10 : ($request->hours_per_session ?? 3);
+        $daysPerWk  = $pkg?->days_per_week ?? 1;
+        $totalSessions = $request->duration_weeks === 1 ? 1 : ($daysPerWk * $request->duration_weeks);
+        $quotedPence = (int) round($avgRate * $sessHours * $totalSessions * 100);
+
         $booking = ServiceRequest::create([
             'client_id'          => $request->user()->id,
             'service_types'      => $request->service_types,
@@ -107,6 +118,7 @@ class BookingController extends Controller
             'working_hour_end'   => $request->working_hour_end,
             'pay_rate'           => $payRate,
             'cost_breakdown'     => $costResult,
+            'quoted_pence'       => $quotedPence,
             'status'             => 'open',
         ]);
 
@@ -209,6 +221,37 @@ class BookingController extends Controller
             return response()->json(['message' => 'Booking must be active before completing.'], 422);
         }
         $booking->update(['status' => 'completed']);
+
+        // Auto-charge saved card if available
+        if ($booking->stripe_payment_method_id && $booking->quoted_pence > 0) {
+            try {
+                $stripe = new StripeClient(config('services.stripe.secret'));
+                $client = $booking->client;
+                $intent = $stripe->paymentIntents->create([
+                    'amount'         => $booking->quoted_pence,
+                    'currency'       => 'gbp',
+                    'customer'       => $client->stripe_customer_id,
+                    'payment_method' => $booking->stripe_payment_method_id,
+                    'confirm'        => true,
+                    'off_session'    => true,
+                    'description'    => 'OurHouseHelp: ' . $booking->servicesSummary(),
+                    'metadata'       => ['booking_id' => (string) $booking->id],
+                ]);
+                if ($intent->status === 'succeeded') {
+                    Payment::create([
+                        'booking_id'               => $booking->id,
+                        'client_id'                => $client->id,
+                        'amount_pence'             => $booking->quoted_pence,
+                        'currency'                 => 'gbp',
+                        'status'                   => 'paid',
+                        'stripe_payment_intent_id' => $intent->id,
+                    ]);
+                }
+            } catch (\Throwable) {
+                // Log silently — don't fail the completion if charge errors
+            }
+        }
+
         return response()->json(['message' => 'Booking marked as completed.', 'booking' => $booking->fresh()]);
     }
 

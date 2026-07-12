@@ -64,6 +64,7 @@ Route::middleware(['auth:sanctum', 'account_type:client'])->group(function () {
     Route::get('/staff/{staff}', [StaffController::class, 'show']);
     Route::post('/client/bookings/{booking}/invite/{staff}', [BookingController::class, 'invite']);
 
+    Route::post('/payments/setup',    [PaymentController::class, 'setup']);
     Route::post('/payments/checkout', [PaymentController::class, 'checkout']);
     Route::get('/payments/booking/{booking}', [PaymentController::class, 'forBooking']);
 });
