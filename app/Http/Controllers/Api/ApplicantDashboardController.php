@@ -36,14 +36,31 @@ class ApplicantDashboardController extends Controller
             ->pluck('service_request_id')
             ->toArray();
 
-        $jobMatches = ServiceRequest::where('status', 'open')
-            ->where('applicant_type', $user->applicant_type)
-            ->whereNotIn('id', $respondedIds)
-            ->where(function ($q) use ($specialties) {
-                foreach ($specialties as $specialty) {
+        $jobMatchesQuery = ServiceRequest::where('status', 'open')
+            ->whereNotIn('id', $respondedIds);
+
+        // Only filter by applicant_type if the staff member has one set —
+        // it's never collected at registration today, so most staff have
+        // it as null and would otherwise never match anything.
+        if (!empty($user->applicant_type)) {
+            $jobMatchesQuery->where('applicant_type', $user->applicant_type);
+        }
+
+        // Only filter by specialties if the staff member has some.
+        // Normalize stored values ("Pet Care" → "pet_care") to match service_types enum.
+        if (!empty($specialties)) {
+            $normalized = array_map(
+                fn($s) => strtolower(str_replace(' ', '_', $s)),
+                $specialties
+            );
+            $jobMatchesQuery->where(function ($q) use ($normalized) {
+                foreach ($normalized as $specialty) {
                     $q->orWhereJsonContains('service_types', $specialty);
                 }
-            })
+            });
+        }
+
+        $jobMatches = $jobMatchesQuery
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()

@@ -39,6 +39,7 @@ Route::middleware('throttle:60,1')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile/photo', [ProfileController::class, 'uploadPhoto']);
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
