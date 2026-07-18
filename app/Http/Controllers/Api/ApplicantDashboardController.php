@@ -25,7 +25,7 @@ class ApplicantDashboardController extends Controller
             ->count();
 
         $verification = [
-            ['key' => 'profile_complete', 'label' => 'Profile Complete',     'verified' => (bool) $user->form_completed],
+            ['key' => 'profile_complete', 'label' => 'Profile Complete',     'verified' => $user->hasCompleteProfile()],
             ['key' => 'right_to_work',    'label' => 'Right to Work',        'verified' => $user->right_to_work_status === 'verified'],
             ['key' => 'dbs_check',        'label' => 'DBS Check',            'verified' => $user->dbs_check_status === 'clear'],
             ['key' => 'id_document',      'label' => 'ID Document Uploaded', 'verified' => (bool) $user->id_document_path],

@@ -93,4 +93,30 @@ class User extends Authenticatable
             'is_available'   => 'boolean',
         ];
     }
+
+    /**
+     * "Profile complete" is derived from the fields staff actually fill in,
+     * rather than the static form_completed column — nothing ever set that
+     * column, and deriving it here means it can't drift out of sync with
+     * what the profile screen collects.
+     */
+    public function missingProfileFields(): array
+    {
+        if ($this->account_type !== 'applicant') {
+            return [];
+        }
+
+        $missing = [];
+        if (empty($this->bio)) $missing[] = 'Bio';
+        if ($this->years_of_experience === null) $missing[] = 'Years of Experience';
+        if (empty($this->specialties)) $missing[] = 'Specialties';
+        if (empty($this->applicant_type)) $missing[] = 'Position Type';
+
+        return $missing;
+    }
+
+    public function hasCompleteProfile(): bool
+    {
+        return empty($this->missingProfileFields());
+    }
 }

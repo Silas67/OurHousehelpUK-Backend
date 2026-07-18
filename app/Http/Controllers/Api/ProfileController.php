@@ -118,6 +118,8 @@ class ProfileController extends Controller
             'profile_photo_url'    => $user->profile_photo_path
                 ? url('storage/' . $user->profile_photo_path)
                 : null,
+            'profile_complete'       => $user->hasCompleteProfile(),
+            'missing_profile_fields' => $user->missingProfileFields(),
         ];
     }
 }
