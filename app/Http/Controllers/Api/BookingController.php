@@ -44,7 +44,7 @@ class BookingController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'service_types'      => ['required', 'array', 'min:1'],
-            'service_types.*'    => ['string', 'in:cleaning,deep_cleaning,cooking,childcare,elderly_care,laundry,ironing,errands,window_cleaning,pet_care'],
+            'service_types.*'    => ['string', 'in:cleaning,deep_cleaning,cooking,childcare,elderly_care,laundry,errands,window_cleaning,pet_care'],
             'applicant_type'     => ['required', 'string', 'in:semi-live-in,live-out'],
             'management_plan'    => ['nullable', 'string', 'in:client-managed,company-managed'],
             'package_id'         => ['nullable', 'integer', 'exists:packages,id'],
@@ -81,10 +81,6 @@ class BookingController extends Controller
             $request->apartment_type_id
         );
 
-        $payRate = $costResult['staff_salary'] > 0
-            ? BookingCostService::format($costResult['staff_salary'])
-            : null;
-
         // Calculate per-session quoted amount for card charge on completion
         $services   = HouseService::whereIn('slug', $request->service_types)->get();
         $avgRate    = $services->isNotEmpty() ? $services->avg('hourly_rate') : 14.0;
@@ -92,6 +88,12 @@ class BookingController extends Controller
         $daysPerWk  = $pkg?->days_per_week ?? 1;
         $totalSessions = $request->duration_weeks === 1 ? 1 : ($daysPerWk * $request->duration_weeks);
         $quotedPence = (int) round($avgRate * $sessHours * $totalSessions * 100);
+
+        // pay_rate is a display-only field (e.g. "£14.00/hr") — cost_breakdown's
+        // staff_salary always comes out £0 since every house_services.base_cost
+        // is £0 and apartment_type_id is never sent by the app, so use the
+        // same real hourly_rate figure quoted_pence is built from instead.
+        $payRate = $avgRate > 0 ? ('£' . number_format($avgRate, 2) . '/hr') : null;
 
         $booking = ServiceRequest::create([
             'client_id'          => $request->user()->id,

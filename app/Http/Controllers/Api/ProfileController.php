@@ -30,7 +30,7 @@ class ProfileController extends Controller
             'postcode'       => ['sometimes', 'nullable', 'string', 'max:10'],
             'years_of_experience' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:60'],
             'specialties'         => ['sometimes', 'array'],
-            'specialties.*'       => ['string', 'in:cleaning,laundry,ironing,cooking,childcare,elderly_care,errands,window_cleaning'],
+            'specialties.*'       => ['string', 'in:cleaning,laundry,cooking,childcare,elderly_care,errands,window_cleaning'],
             'applicant_type'      => ['sometimes', 'nullable', 'string', 'in:semi-live-in,live-out'],
         ]);
 

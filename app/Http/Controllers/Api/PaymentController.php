@@ -91,10 +91,11 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $breakdown   = $booking->cost_breakdown ?? [];
-        $amountPence = isset($breakdown['client_total'])
-            ? (int) round((float) $breakdown['client_total'] * 100)
-            : 0;
+        // quoted_pence is computed at booking creation from the actual
+        // house_services.hourly_rate figures — cost_breakdown comes from a
+        // separate, unused pricing engine where every base_cost is £0 and
+        // would always produce a non-payable amount here.
+        $amountPence = (int) ($booking->quoted_pence ?? 0);
 
         if ($amountPence <= 0) {
             return response()->json(['message' => 'Booking has no payable amount.'], 422);
