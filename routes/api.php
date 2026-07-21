@@ -22,6 +22,12 @@ Route::get('/health', fn() => response()->json(['status' => 'ok']));
 // Stripe webhook — must be public and receive raw body (no Sanctum, no CSRF)
 Route::post('/stripe/webhook', [PaymentController::class, 'webhook']);
 
+// Signed document links — no Sanctum token attached when opened via
+// Linking.openURL, so the signature itself is what proves access.
+Route::get('/documents/{type}/{user}', [ProfileController::class, 'serveDocument'])
+    ->name('documents.show')
+    ->middleware('signed');
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/register/client', [RegisterController::class, 'client'])->middleware('throttle:login');
 Route::post('/register/applicant', [RegisterController::class, 'applicant'])->middleware('throttle:login');
@@ -41,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::post('/profile/photo', [ProfileController::class, 'uploadPhoto']);
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
+    Route::get('/profile/documents/{type}/link', [ProfileController::class, 'documentLink']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);

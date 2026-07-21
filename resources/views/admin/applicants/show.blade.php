@@ -85,17 +85,23 @@
                 @endif
                 @if($user->id_document_path)
                     <div>
-                        <div class="detail-label" style="margin-bottom: 6px;">ID Document</div>
-                        @php $ext = pathinfo($user->id_document_path, PATHINFO_EXTENSION); @endphp
-                        @if(in_array(strtolower($ext), ['jpg','jpeg','png']))
-                            <img src="{{ asset('storage/' . $user->id_document_path) }}" alt="ID Document"
-                                 style="max-width: 100%; border-radius: 8px; border: 1px solid #e2e8f0;">
-                        @else
-                            <a href="{{ asset('storage/' . $user->id_document_path) }}" target="_blank" class="btn btn-outline btn-sm">View Document (PDF)</a>
-                        @endif
+                        <div class="detail-label" style="margin-bottom: 6px;">ID Document ({{ str_replace('_', ' ', $user->right_to_work_document_type ?? '') }})</div>
+                        <a href="{{ route('admin.applicants.document', [$user, 'id_document']) }}" target="_blank" class="btn btn-outline btn-sm">View Document</a>
                     </div>
                 @endif
-                @if(!$user->profile_photo_path && !$user->id_document_path)
+                @if($user->cv_path)
+                    <div>
+                        <div class="detail-label" style="margin-bottom: 6px;">CV</div>
+                        <a href="{{ route('admin.applicants.document', [$user, 'cv']) }}" target="_blank" class="btn btn-outline btn-sm">View CV</a>
+                    </div>
+                @endif
+                @if($user->dbs_certificate_path)
+                    <div>
+                        <div class="detail-label" style="margin-bottom: 6px;">DBS Certificate</div>
+                        <a href="{{ route('admin.applicants.document', [$user, 'dbs_certificate']) }}" target="_blank" class="btn btn-outline btn-sm">View Certificate</a>
+                    </div>
+                @endif
+                @if(!$user->profile_photo_path && !$user->id_document_path && !$user->cv_path && !$user->dbs_certificate_path)
                     <p style="color: #94a3b8; font-size: 13px;">No documents uploaded.</p>
                 @endif
             </div>
@@ -110,18 +116,19 @@
                     <div class="form-group">
                         <label>Right to Work Status</label>
                         <select name="right_to_work_status">
-                            <option value="pending"  {{ ($user->right_to_work_status ?? 'pending') === 'pending'  ? 'selected' : '' }}>Pending</option>
+                            <option value="not_started" {{ ($user->right_to_work_status ?? 'not_started') === 'not_started' ? 'selected' : '' }}>Not Started</option>
+                            <option value="pending"  {{ ($user->right_to_work_status ?? '') === 'pending'  ? 'selected' : '' }}>Pending</option>
                             <option value="verified" {{ ($user->right_to_work_status ?? '') === 'verified' ? 'selected' : '' }}>Verified ✓</option>
-                            <option value="failed"   {{ ($user->right_to_work_status ?? '') === 'failed'   ? 'selected' : '' }}>Failed ✗</option>
+                            <option value="rejected" {{ ($user->right_to_work_status ?? '') === 'rejected' ? 'selected' : '' }}>Rejected ✗</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>DBS Check Status</label>
                         <select name="dbs_check_status">
-                            <option value="pending"   {{ ($user->dbs_check_status ?? 'pending') === 'pending'   ? 'selected' : '' }}>Pending</option>
-                            <option value="submitted" {{ ($user->dbs_check_status ?? '') === 'submitted' ? 'selected' : '' }}>Submitted</option>
+                            <option value="not_started" {{ ($user->dbs_check_status ?? 'not_started') === 'not_started' ? 'selected' : '' }}>Not Started</option>
+                            <option value="pending"   {{ ($user->dbs_check_status ?? '') === 'pending'   ? 'selected' : '' }}>Pending</option>
                             <option value="clear"     {{ ($user->dbs_check_status ?? '') === 'clear'     ? 'selected' : '' }}>Clear ✓</option>
-                            <option value="barred"    {{ ($user->dbs_check_status ?? '') === 'barred'    ? 'selected' : '' }}>Barred ✗</option>
+                            <option value="flagged"   {{ ($user->dbs_check_status ?? '') === 'flagged'   ? 'selected' : '' }}>Flagged ✗</option>
                         </select>
                     </div>
                     <div class="form-row">

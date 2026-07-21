@@ -11,10 +11,18 @@ use App\Models\ServiceRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class AdminController extends Controller
 {
+    // cv/dbs_certificate/id_document all live on the private disk — this is
+    // the only map of "type" -> column, shared by applicantDocument() below.
+    private const DOCUMENT_FIELDS = [
+        'cv'              => 'cv_path',
+        'dbs_certificate' => 'dbs_certificate_path',
+        'id_document'     => 'id_document_path',
+    ];
     // ─── Auth ────────────────────────────────────────────────────────────────
 
     public function loginForm()
@@ -103,13 +111,24 @@ class AdminController extends Controller
         return view('admin.applicants.show', compact('user'));
     }
 
+    public function applicantDocument(User $user, string $type)
+    {
+        abort_if($user->account_type !== 'applicant', 404);
+        abort_unless(array_key_exists($type, self::DOCUMENT_FIELDS), 404);
+
+        $path = $user->{self::DOCUMENT_FIELDS[$type]};
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
     public function applicantVerify(Request $request, User $user)
     {
         abort_if($user->account_type !== 'applicant', 404);
 
         $validated = Validator::make($request->all(), [
-            'right_to_work_status'  => ['nullable', 'string', 'in:pending,verified,failed'],
-            'dbs_check_status'      => ['nullable', 'string', 'in:pending,submitted,clear,barred'],
+            'right_to_work_status'  => ['nullable', 'string', 'in:not_started,pending,verified,rejected'],
+            'dbs_check_status'      => ['nullable', 'string', 'in:not_started,pending,clear,flagged'],
             'dbs_certificate_number'=> ['nullable', 'string', 'max:20'],
             'dbs_check_date'        => ['nullable', 'date'],
         ])->validate();

@@ -7,10 +7,20 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 
 class ProfileController extends Controller
 {
+    // Maps a client-facing document "type" to the private-disk path column
+    // that stores it — cv/dbs_certificate/id_document all live on the
+    // default private disk, unlike profile photos which are public.
+    private const DOCUMENT_FIELDS = [
+        'cv'              => 'cv_path',
+        'dbs_certificate' => 'dbs_certificate_path',
+        'id_document'     => 'id_document_path',
+    ];
+
     public function show(Request $request)
     {
         return response()->json(['user' => $this->formatUser($request->user())]);
@@ -66,6 +76,52 @@ class ProfileController extends Controller
         return response()->json(['message' => 'Photo updated.', 'user' => $this->formatUser($user->fresh())]);
     }
 
+    /**
+     * GET /profile/documents/{type}/link — returns a short-lived signed URL
+     * the app can open directly (e.g. via Linking.openURL) without needing
+     * to attach an auth header, since the signature itself is the proof.
+     */
+    public function documentLink(Request $request, string $type)
+    {
+        if (!array_key_exists($type, self::DOCUMENT_FIELDS)) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        $user = $request->user();
+        $path = $user->{self::DOCUMENT_FIELDS[$type]};
+
+        if (!$path) {
+            return response()->json(['message' => 'No document uploaded.'], 404);
+        }
+
+        $url = URL::temporarySignedRoute('documents.show', now()->addMinutes(10), [
+            'type' => $type,
+            'user' => $user->id,
+        ]);
+
+        return response()->json(['url' => $url]);
+    }
+
+    /**
+     * GET /documents/{type}/{user} — public route, but requires a valid
+     * signature (see documentLink above), so it's only reachable via a URL
+     * this controller itself just issued and that hasn't expired.
+     */
+    public function serveDocument(Request $request, string $type, User $user)
+    {
+        if (!array_key_exists($type, self::DOCUMENT_FIELDS)) {
+            abort(404);
+        }
+
+        $path = $user->{self::DOCUMENT_FIELDS[$type]};
+
+        if (!$path || !Storage::disk('local')->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->response($path);
+    }
+
     public function toggleAvailability(Request $request)
     {
         $user = $request->user();
@@ -112,14 +168,21 @@ class ProfileController extends Controller
             'address_line_1'       => $user->address_line_1,
             'address_line_2'       => $user->address_line_2,
             'postcode'             => $user->postcode,
-            'right_to_work_status' => $user->right_to_work_status,
-            'dbs_check_status'     => $user->dbs_check_status,
-            'is_available'         => (bool) $user->is_available,
+            'right_to_work_status'         => $user->right_to_work_status,
+            'right_to_work_document_type'  => $user->right_to_work_document_type,
+            'right_to_work_checked_at'     => $user->right_to_work_checked_at?->toDateTimeString(),
+            'dbs_check_status'             => $user->dbs_check_status,
+            'dbs_certificate_number'       => $user->dbs_certificate_number,
+            'dbs_check_date'               => $user->dbs_check_date?->toDateString(),
+            'is_available'                 => (bool) $user->is_available,
             'profile_photo_url'    => $user->profile_photo_path
                 ? url('storage/' . $user->profile_photo_path)
                 : null,
             'profile_complete'       => $user->hasCompleteProfile(),
             'missing_profile_fields' => $user->missingProfileFields(),
+            'has_cv'                 => (bool) $user->cv_path,
+            'has_dbs_certificate'    => (bool) $user->dbs_certificate_path,
+            'has_id_document'        => (bool) $user->id_document_path,
         ];
     }
 }

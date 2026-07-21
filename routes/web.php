@@ -23,6 +23,7 @@ Route::middleware(['App\Http\Middleware\AdminOnly'])
         Route::get('/applicants',  [AdminController::class, 'applicants'])->name('applicants');
         Route::get('/applicants/{user}', [AdminController::class, 'applicantShow'])->name('applicants.show');
         Route::post('/applicants/{user}/verify', [AdminController::class, 'applicantVerify'])->name('applicants.verify');
+        Route::get('/applicants/{user}/document/{type}', [AdminController::class, 'applicantDocument'])->name('applicants.document');
         Route::get('/requests',    [AdminController::class, 'requests'])->name('requests');
         Route::get('/requests/{serviceRequest}', [AdminController::class, 'requestShow'])->name('requests.show');
         Route::post('/requests/{serviceRequest}/pay-rate', [AdminController::class, 'setPayRate'])->name('requests.pay-rate');

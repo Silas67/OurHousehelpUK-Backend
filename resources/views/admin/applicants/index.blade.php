@@ -14,9 +14,10 @@
         <label>Right to Work</label>
         <select name="rtw">
             <option value="">All</option>
+            <option value="not_started" {{ request('rtw') === 'not_started' ? 'selected' : '' }}>Not Started</option>
             <option value="pending"  {{ request('rtw') === 'pending'  ? 'selected' : '' }}>Pending</option>
             <option value="verified" {{ request('rtw') === 'verified' ? 'selected' : '' }}>Verified</option>
-            <option value="failed"   {{ request('rtw') === 'failed'   ? 'selected' : '' }}>Failed</option>
+            <option value="rejected" {{ request('rtw') === 'rejected' ? 'selected' : '' }}>Rejected</option>
         </select>
     </div>
     <button type="submit" class="btn btn-primary btn-sm">Filter</button>
@@ -44,19 +45,19 @@
                 <td style="color: #64748b;">{{ $applicant->email }}</td>
                 <td><span class="badge badge-info" style="text-transform: capitalize;">{{ $applicant->applicant_type ?? '—' }}</span></td>
                 <td>
-                    @php $rtw = $applicant->right_to_work_status ?? 'pending'; @endphp
-                    <span class="badge {{ $rtw === 'verified' ? 'badge-success' : ($rtw === 'failed' ? 'badge-danger' : 'badge-warning') }}">
-                        {{ ucfirst($rtw) }}
+                    @php $rtw = $applicant->right_to_work_status ?? 'not_started'; @endphp
+                    <span class="badge {{ $rtw === 'verified' ? 'badge-success' : ($rtw === 'rejected' ? 'badge-danger' : 'badge-warning') }}">
+                        {{ ucfirst(str_replace('_', ' ', $rtw)) }}
                     </span>
                 </td>
                 <td>
-                    @php $dbs = $applicant->dbs_check_status ?? 'pending'; @endphp
-                    <span class="badge {{ $dbs === 'clear' ? 'badge-success' : ($dbs === 'barred' ? 'badge-danger' : 'badge-warning') }}">
-                        {{ ucfirst($dbs) }}
+                    @php $dbs = $applicant->dbs_check_status ?? 'not_started'; @endphp
+                    <span class="badge {{ $dbs === 'clear' ? 'badge-success' : ($dbs === 'flagged' ? 'badge-danger' : 'badge-warning') }}">
+                        {{ ucfirst(str_replace('_', ' ', $dbs)) }}
                     </span>
                 </td>
                 <td>
-                    @if($applicant->form_completed)
+                    @if($applicant->hasCompleteProfile())
                         <span class="badge badge-success">Complete</span>
                     @else
                         <span class="badge badge-muted">Incomplete</span>
