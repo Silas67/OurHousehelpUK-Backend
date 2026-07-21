@@ -15,6 +15,12 @@ class JobController extends Controller
         $user = $request->user();
         $specialties = $user->specialties ?? [];
 
+        // Right to work and DBS must both be cleared before a worker can
+        // see/accept jobs.
+        if (!$user->isVettedForPlacement()) {
+            return response()->json(['jobs' => []]);
+        }
+
         // Exclude jobs already responded to (accepted or declined)
         $respondedIds = JobApplication::where('applicant_id', $user->id)
             ->pluck('service_request_id')
@@ -98,6 +104,10 @@ class JobController extends Controller
         }
 
         $user = $request->user();
+
+        if (!$user->isVettedForPlacement()) {
+            return response()->json(['message' => 'Your right to work and DBS check must be cleared before you can accept jobs.'], 422);
+        }
 
         $already = JobApplication::where('service_request_id', $job->id)
             ->where('applicant_id', $user->id)

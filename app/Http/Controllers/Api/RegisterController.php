@@ -48,7 +48,13 @@ class RegisterController extends Controller
             'postcode'  => ['required', 'string', 'max:10'],
             'password'  => ['required', 'string', 'min:8', 'confirmed'],
             'cv'              => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
-            'dbs_certificate' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png', 'max:10240'],
+            'dbs_certificate' => ['required', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png', 'max:10240'],
+            // Right to work is a statutory gate — every worker needs it, not just
+            // childcare/vulnerable-person roles, so it's required at registration
+            // rather than left to a later profile-completion step.
+            'ni_number'                   => ['required', 'string', 'max:20'],
+            'right_to_work_document_type' => ['required', 'string', 'in:passport,brp,visa'],
+            'id_document'                 => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
 
         if ($validator->fails()) {
@@ -61,23 +67,26 @@ class RegisterController extends Controller
 
         try {
             $cvPath  = $request->file('cv')->store('cvs');
-            $dbsPath = $request->hasFile('dbs_certificate')
-                ? $request->file('dbs_certificate')->store('dbs_certificates')
-                : null;
+            $dbsPath = $request->file('dbs_certificate')->store('dbs_certificates');
+            $idDocumentPath = $request->file('id_document')->store('id_documents');
 
             $user = User::create([
-                'name'                => $validated['name'],
-                'last_name'           => $validated['last_name'],
-                'email'               => $validated['email'],
-                'phone'               => $validated['phone'],
-                'password'            => bcrypt($validated['password']),
-                'account_type'        => 'applicant',
-                'postcode'            => strtoupper($validated['postcode']),
-                'cv_path'             => $cvPath,
-                'dbs_certificate_path'=> $dbsPath,
-                'dbs_check_status'    => $dbsPath ? 'submitted' : 'pending',
-                'application_status'  => 'pending',
-                'terms_accepted'      => true,
+                'name'                         => $validated['name'],
+                'last_name'                    => $validated['last_name'],
+                'email'                        => $validated['email'],
+                'phone'                        => $validated['phone'],
+                'password'                     => bcrypt($validated['password']),
+                'account_type'                 => 'applicant',
+                'postcode'                     => strtoupper($validated['postcode']),
+                'cv_path'                      => $cvPath,
+                'dbs_certificate_path'         => $dbsPath,
+                'dbs_check_status'             => 'pending',
+                'ni_number'                    => $validated['ni_number'],
+                'id_document_path'             => $idDocumentPath,
+                'right_to_work_document_type'  => $validated['right_to_work_document_type'],
+                'right_to_work_status'         => 'pending',
+                'application_status'           => 'pending',
+                'terms_accepted'               => true,
             ]);
 
             DB::commit();

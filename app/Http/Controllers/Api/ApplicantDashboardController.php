@@ -93,7 +93,7 @@ class ApplicantDashboardController extends Controller
             'stats'           => ['jobs_completed' => $completedJobs, 'rating' => null, 'pending_offers' => $pendingOffers],
             'is_available'    => (bool) $user->is_available,
             'verification'    => $verification,
-            'job_matches'     => $user->is_available ? $jobMatches : [],
+            'job_matches'     => ($user->is_available && $user->isVettedForPlacement()) ? $jobMatches : [],
             'my_applications' => $myApplications,
         ]);
     }

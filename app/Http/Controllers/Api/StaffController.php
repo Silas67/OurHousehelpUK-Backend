@@ -11,13 +11,10 @@ class StaffController extends Controller
 {
     public function index(Request $request)
     {
-        // form_completed is never set by any registration/profile flow today,
-        // so filtering on it here would hide every applicant. Show all
-        // registered staff instead — verification status is already
-        // surfaced per-card via dbs_verified/rtw_verified.
         $staff = User::where('account_type', 'applicant')
             ->select(['id', 'name', 'last_name', 'bio', 'years_of_experience', 'specialties', 'city', 'profile_photo_path', 'applicant_type', 'dbs_check_status', 'right_to_work_status'])
             ->get()
+            ->filter(fn($u) => $u->isVettedForPlacement())
             ->map(fn($u) => [
                 'id'                  => $u->id,
                 'name'                => trim($u->name . ' ' . ($u->last_name ? substr($u->last_name, 0, 1) . '.' : '')),

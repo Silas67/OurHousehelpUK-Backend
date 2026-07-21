@@ -119,4 +119,16 @@ class User extends Authenticatable
     {
         return empty($this->missingProfileFields());
     }
+
+    /**
+     * Whether this worker can be shown to clients / matched to jobs. Under
+     * the company-managed model this platform — not the client — carries
+     * the statutory liability for right to work and DBS, so both must be
+     * cleared first.
+     */
+    public function isVettedForPlacement(): bool
+    {
+        return $this->right_to_work_status === 'verified'
+            && $this->dbs_check_status === 'clear';
+    }
 }
