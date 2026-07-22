@@ -48,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile/photo', [ProfileController::class, 'uploadPhoto']);
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
     Route::get('/profile/documents/{type}/link', [ProfileController::class, 'documentLink']);
+    Route::post('/profile/documents/{type}', [ProfileController::class, 'uploadDocument']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
@@ -72,7 +73,6 @@ Route::middleware(['auth:sanctum', 'account_type:client'])->group(function () {
     Route::get('/staff/{staff}', [StaffController::class, 'show']);
     Route::post('/client/bookings/{booking}/invite/{staff}', [BookingController::class, 'invite']);
 
-    Route::post('/payments/setup',    [PaymentController::class, 'setup']);
     Route::post('/payments/checkout', [PaymentController::class, 'checkout']);
     Route::get('/payments/booking/{booking}', [PaymentController::class, 'forBooking']);
 });
@@ -87,5 +87,7 @@ Route::middleware(['auth:sanctum', 'account_type:applicant'])->group(function ()
     Route::post('/applicant/jobs/{job}/accept', [JobController::class, 'accept']);
     Route::post('/applicant/jobs/{job}/decline', [JobController::class, 'decline']);
     Route::get('/applicant/applications', [JobController::class, 'myApplications']);
+    Route::post('/applicant/invitations/{job}/accept', [JobController::class, 'acceptInvite']);
+    Route::post('/applicant/invitations/{job}/decline', [JobController::class, 'declineInvite']);
     Route::get('/applicant/confirmed-jobs/{booking}', [JobController::class, 'confirmedJob']);
 });

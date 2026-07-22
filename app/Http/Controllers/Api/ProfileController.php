@@ -77,6 +77,57 @@ class ProfileController extends Controller
     }
 
     /**
+     * POST /profile/documents/{type} — (re-)upload a DBS certificate or ID
+     * document. Always resets the corresponding status back to 'pending':
+     * an old 'clear'/'verified' decision must not carry over to a document
+     * nobody has reviewed yet, even though that means the staff member
+     * drops out of the marketplace/job matching until it's reviewed again.
+     */
+    public function uploadDocument(Request $request, string $type)
+    {
+        $rules = match ($type) {
+            'dbs_certificate' => ['document' => ['required', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png', 'max:10240']],
+            'id_document'     => [
+                'document'                    => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+                'right_to_work_document_type' => ['sometimes', 'string', 'in:passport,brp,visa'],
+            ],
+            default => null,
+        };
+
+        if (!$rules) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first(), 'errors' => $validator->errors()], 422);
+        }
+
+        $user   = $request->user();
+        $column = self::DOCUMENT_FIELDS[$type];
+
+        if ($user->{$column}) {
+            Storage::disk('local')->delete($user->{$column});
+        }
+
+        $storageDir = $type === 'dbs_certificate' ? 'dbs_certificates' : 'id_documents';
+        $updates = [$column => $request->file('document')->store($storageDir)];
+
+        if ($type === 'dbs_certificate') {
+            $updates['dbs_check_status'] = 'pending';
+        } else {
+            $updates['right_to_work_status'] = 'pending';
+            if ($request->filled('right_to_work_document_type')) {
+                $updates['right_to_work_document_type'] = $request->right_to_work_document_type;
+            }
+        }
+
+        $user->update($updates);
+
+        return response()->json(['message' => 'Document uploaded.', 'user' => $this->formatUser($user->fresh())]);
+    }
+
+    /**
      * GET /profile/documents/{type}/link — returns a short-lived signed URL
      * the app can open directly (e.g. via Linking.openURL) without needing
      * to attach an auth header, since the signature itself is the proof.

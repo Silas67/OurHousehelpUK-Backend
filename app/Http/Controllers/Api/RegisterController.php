@@ -55,6 +55,9 @@ class RegisterController extends Controller
             'ni_number'                   => ['required', 'string', 'max:20'],
             'right_to_work_document_type' => ['required', 'string', 'in:passport,brp,visa'],
             'id_document'                 => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            // Must actively accept the Partner Agreement — 'accepted' passes
+            // for "1"/true/"yes"/"on", fails when absent or falsy.
+            'terms_accepted'              => ['accepted'],
         ]);
 
         if ($validator->fails()) {

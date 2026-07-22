@@ -150,6 +150,78 @@ class JobController extends Controller
         return response()->json(['message' => 'Job removed from your list.'], 201);
     }
 
+    /**
+     * Open jobs a client has personally invited this staff member to.
+     * Shared by the applicant dashboard so the home screen needs one fetch.
+     */
+    public static function invitationsFor(int $applicantId): array
+    {
+        return JobApplication::where('applicant_id', $applicantId)
+            ->where('status', 'invited')
+            ->with('serviceRequest:id,service_types,package_name,service_days,pay_rate,status,city,postcode,start_date,applicant_type')
+            ->orderByDesc('created_at')
+            ->get()
+            ->filter(fn($a) => $a->serviceRequest && $a->serviceRequest->status === 'open')
+            ->map(fn($a) => [
+                'id'             => $a->id,
+                'booking_id'     => $a->service_request_id,
+                'service'        => $a->serviceRequest->servicesSummary(),
+                'applicant_type' => $a->serviceRequest->applicant_type,
+                'area'           => $a->serviceRequest->city . ', ' . $a->serviceRequest->postcode,
+                'schedule'       => $a->serviceRequest->package_name ?? ($a->serviceRequest->service_days ?? 'Flexible'),
+                'pay'            => $a->serviceRequest->pay_rate,
+                'start_date'     => $a->serviceRequest->start_date?->toDateString(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function acceptInvite(Request $request, ServiceRequest $job)
+    {
+        $user = $request->user();
+
+        if (!$user->isVettedForPlacement()) {
+            return response()->json(['message' => 'Your right to work and DBS check must be cleared before you can accept jobs.'], 422);
+        }
+
+        if ($job->status !== 'open') {
+            return response()->json(['message' => 'This job is no longer available.'], 422);
+        }
+
+        $application = JobApplication::where('service_request_id', $job->id)
+            ->where('applicant_id', $user->id)
+            ->where('status', 'invited')
+            ->first();
+
+        if (!$application) {
+            return response()->json(['message' => 'Invitation not found.'], 404);
+        }
+
+        // Accepting an invite puts the staff member into the client's pool of
+        // interested applicants — the client still confirms and pays to select.
+        $application->update(['status' => 'pending']);
+
+        $job->client->notify(new JobAcceptedNotification($job, $user));
+
+        return response()->json(['message' => 'Invitation accepted. The client will be notified.']);
+    }
+
+    public function declineInvite(Request $request, ServiceRequest $job)
+    {
+        $application = JobApplication::where('service_request_id', $job->id)
+            ->where('applicant_id', $request->user()->id)
+            ->where('status', 'invited')
+            ->first();
+
+        if (!$application) {
+            return response()->json(['message' => 'Invitation not found.'], 404);
+        }
+
+        $application->update(['status' => 'declined']);
+
+        return response()->json(['message' => 'Invitation declined.']);
+    }
+
     public function confirmedJob(Request $request, ServiceRequest $booking)
     {
         $user = $request->user();
