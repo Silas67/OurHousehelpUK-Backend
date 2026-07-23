@@ -141,6 +141,10 @@
                             <input type="date" name="dbs_check_date" value="{{ $user->dbs_check_date?->format('Y-m-d') ?? '' }}">
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label>References Checked (count)</label>
+                        <input type="number" name="references_checked" min="0" max="20" value="{{ $user->references_checked ?? '' }}" placeholder="e.g. 2">
+                    </div>
                     <button type="submit" class="btn btn-primary" style="margin-top: 4px;">Save Changes</button>
                 </form>
             </div>

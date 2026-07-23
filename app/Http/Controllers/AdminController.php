@@ -131,6 +131,7 @@ class AdminController extends Controller
             'dbs_check_status'      => ['nullable', 'string', 'in:not_started,pending,clear,flagged'],
             'dbs_certificate_number'=> ['nullable', 'string', 'max:20'],
             'dbs_check_date'        => ['nullable', 'date'],
+            'references_checked'    => ['nullable', 'integer', 'min:0', 'max:20'],
         ])->validate();
 
         $updates = array_filter($validated, fn($v) => $v !== null);

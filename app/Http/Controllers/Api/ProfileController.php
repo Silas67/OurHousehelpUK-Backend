@@ -42,6 +42,12 @@ class ProfileController extends Controller
             'specialties'         => ['sometimes', 'array'],
             'specialties.*'       => ['string', 'in:cleaning,laundry,cooking,childcare,elderly_care,errands,window_cleaning'],
             'applicant_type'      => ['sometimes', 'nullable', 'string', 'in:semi-live-in,live-out'],
+            'languages'           => ['sometimes', 'array', 'max:12'],
+            'languages.*'         => ['string', 'max:40'],
+            'household_types'     => ['sometimes', 'array', 'max:8'],
+            'household_types.*'   => ['string', 'in:Family home,Family with children,Single professional,Couple,Elderly,Shared house'],
+            'availability_days'   => ['sometimes', 'array', 'max:7'],
+            'availability_days.*' => ['string', 'in:Mon,Tue,Wed,Thu,Fri,Sat,Sun'],
         ]);
 
         if ($validator->fails()) {
@@ -215,6 +221,9 @@ class ProfileController extends Controller
             'bio'                  => $user->bio,
             'years_of_experience'  => $user->years_of_experience,
             'specialties'          => $user->specialties ?? [],
+            'languages'            => $user->languages ?? [],
+            'household_types'      => $user->household_types ?? [],
+            'availability_days'    => $user->availability_days ?? [],
             'city'                 => $user->city,
             'address_line_1'       => $user->address_line_1,
             'address_line_2'       => $user->address_line_2,

@@ -97,15 +97,43 @@ class StaffController extends Controller
                 'member_since'         => $staff->created_at?->format('F Y'),
                 'available_from'       => $staff->is_available ? 'Immediately' : null,
                 'hourly_rate'          => $hourlyRate,
-
-                // No backing data yet — returned as null so the app hides
-                // these sections rather than showing empty state.
-                'availability_days'    => null,
-                'references_count'     => null,
-                'household_types'      => null,
-                'languages'            => null,
+                'availability_days'    => $this->availabilityLabel($staff->availability_days ?? []),
+                'references_count'     => $staff->references_checked,
+                'household_types'      => $staff->household_types ?: null,
+                'languages'            => $staff->languages ?: null,
             ],
         ]);
+    }
+
+    /** ['Mon','Tue','Wed','Thu','Fri'] -> "Mon–Fri"; non-contiguous -> comma list. */
+    private function availabilityLabel(array $days): ?string
+    {
+        if (empty($days)) {
+            return null;
+        }
+
+        $order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        $indices = collect($days)
+            ->map(fn($d) => array_search($d, $order, true))
+            ->filter(fn($i) => $i !== false)
+            ->sort()
+            ->values()
+            ->all();
+
+        if (empty($indices)) {
+            return null;
+        }
+        if (count($indices) === 7) {
+            return 'Every day';
+        }
+
+        // Contiguous run -> range label
+        $contiguous = $indices === range($indices[0], $indices[count($indices) - 1]);
+        if ($contiguous && count($indices) > 2) {
+            return $order[$indices[0]] . '–' . $order[end($indices)];
+        }
+
+        return implode(', ', array_map(fn($i) => $order[$i], $indices));
     }
 
     /** "Sarah Thompson" -> "Sarah T." for public-facing review attribution. */
