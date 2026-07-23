@@ -89,10 +89,17 @@ class ApplicantDashboardController extends Controller
                 'job_status' => $a->serviceRequest->status,
             ]);
 
+        // Optional profile extras that enrich the client-facing profile but
+        // aren't required — drives a subtle "stand out" nudge on the dashboard.
+        $profileExtrasComplete = !empty($user->availability_days)
+            && !empty($user->household_types)
+            && !empty($user->languages);
+
         return response()->json([
             'stats'           => ['jobs_completed' => $completedJobs, 'rating' => null, 'pending_offers' => $pendingOffers],
             'is_available'    => (bool) $user->is_available,
             'verification'    => $verification,
+            'profile_extras_complete' => $profileExtrasComplete,
             'invitations'     => $user->isVettedForPlacement() ? JobController::invitationsFor($user->id) : [],
             'job_matches'     => ($user->is_available && $user->isVettedForPlacement()) ? $jobMatches : [],
             'my_applications' => $myApplications,
