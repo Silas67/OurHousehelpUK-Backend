@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\HouseService;
+use App\Models\JobApplication;
+use App\Models\Rating;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class StaffController extends Controller
 {
@@ -37,6 +39,39 @@ class StaffController extends Controller
             return response()->json(['message' => 'Not found.'], 404);
         }
 
+        // Ratings / reviews
+        $ratings     = Rating::where('applicant_id', $staff->id)->get();
+        $reviewCount = $ratings->count();
+        $rating      = $reviewCount ? round($ratings->avg('stars'), 1) : null;
+        $reviews     = Rating::where('applicant_id', $staff->id)
+            ->with('client:id,name')
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(fn($r) => [
+                'client_name' => $this->shortName($r->client?->name),
+                'stars'       => (int) $r->stars,
+                'comment'     => $r->comment,
+                'date'        => $r->created_at?->format('j M Y'),
+            ])
+            ->values();
+
+        // Completed jobs
+        $jobsCompleted = JobApplication::where('applicant_id', $staff->id)
+            ->where('status', 'accepted')
+            ->whereHas('serviceRequest', fn($q) => $q->where('status', 'completed'))
+            ->count();
+
+        // Indicative hourly rate = average of the seeded rates for the
+        // services this staff member offers (null if they've set none).
+        $specialties = $staff->specialties ?? [];
+        $hourlyRate  = null;
+        if (!empty($specialties)) {
+            $normalized = array_map(fn($s) => strtolower(str_replace(' ', '_', $s)), $specialties);
+            $avgRate    = HouseService::whereIn('slug', $normalized)->avg('hourly_rate');
+            $hourlyRate = $avgRate ? round($avgRate) : null;
+        }
+
         return response()->json([
             'staff' => [
                 'id'                   => $staff->id,
@@ -49,10 +84,39 @@ class StaffController extends Controller
                 'city'                 => $staff->city,
                 'right_to_work_status' => $staff->right_to_work_status,
                 'dbs_check_status'     => $staff->dbs_check_status,
+                'rtw_verified'         => $staff->right_to_work_status === 'verified',
+                'dbs_verified'         => $staff->dbs_check_status === 'clear',
+                'id_verified'          => (bool) $staff->id_document_path,
                 'profile_photo_url'    => $staff->profile_photo_path
                     ? url('storage/' . $staff->profile_photo_path)
                     : null,
+                'rating'               => $rating,
+                'review_count'         => $reviewCount,
+                'reviews'              => $reviews,
+                'jobs_completed'       => $jobsCompleted,
+                'member_since'         => $staff->created_at?->format('F Y'),
+                'available_from'       => $staff->is_available ? 'Immediately' : null,
+                'hourly_rate'          => $hourlyRate,
+
+                // No backing data yet — returned as null so the app hides
+                // these sections rather than showing empty state.
+                'availability_days'    => null,
+                'references_count'     => null,
+                'household_types'      => null,
+                'languages'            => null,
             ],
         ]);
+    }
+
+    /** "Sarah Thompson" -> "Sarah T." for public-facing review attribution. */
+    private function shortName(?string $name): string
+    {
+        $parts = preg_split('/\s+/', trim((string) $name), -1, PREG_SPLIT_NO_EMPTY);
+        if (empty($parts)) {
+            return 'A client';
+        }
+        $first = $parts[0];
+        $initial = count($parts) > 1 ? ' ' . strtoupper(substr(end($parts), 0, 1)) . '.' : '';
+        return $first . $initial;
     }
 }
