@@ -12,6 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Render terminates TLS at its edge and forwards HTTP internally.
+        // Without trusting the proxy, Laravel thinks requests are HTTP and
+        // generates http:// URLs (e.g. profile_photo_url), which the HTTPS
+        // web app then blocks as mixed content. Trust the proxy so generated
+        // URLs use https.
+        $middleware->trustProxies(at: '*');
+
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
