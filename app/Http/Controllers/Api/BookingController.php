@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\HouseService;
-use App\Models\Package;
 use App\Models\ServiceRequest;
 use App\Models\User;
 use App\Notifications\InvitationNotification;
@@ -46,12 +45,11 @@ class BookingController extends Controller
             'service_types.*'    => ['string', 'in:cleaning,deep_cleaning,cooking,childcare,elderly_care,laundry,errands,window_cleaning,pet_care'],
             'applicant_type'     => ['required', 'string', 'in:semi-live-in,live-out'],
             'management_plan'    => ['nullable', 'string', 'in:client-managed,company-managed'],
-            'package_id'         => ['nullable', 'integer', 'exists:packages,id'],
             'apartment_type_id'  => ['nullable', 'integer', 'exists:apartment_types,id'],
             'bedrooms'           => ['nullable', 'integer', 'min:0', 'max:10'],
             'bathrooms'          => ['nullable', 'integer', 'min:0', 'max:10'],
             'kitchens'           => ['nullable', 'integer', 'min:0', 'max:10'],
-            'hours_per_session'  => ['nullable', 'integer', 'min:1', 'max:12'],
+            'hours_per_session'  => ['nullable', 'numeric', 'min:1', 'max:12', 'multiple_of:0.5'],
             'address_line_1'     => ['required', 'string', 'max:255'],
             'address_line_2'     => ['nullable', 'string', 'max:255'],
             'city'               => ['required', 'string', 'max:255'],
@@ -68,24 +66,32 @@ class BookingController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        // Days per week is derived from the days the client selected (packages
+        // have been removed). One-off bookings are a single session.
+        $daysPerWk = $request->filled('service_days')
+            ? count(array_filter(array_map('trim', explode(',', $request->service_days))))
+            : 1;
+        $daysPerWk = max(1, $daysPerWk);
+
         // Calculate cost using the service
         $managementPlan = $request->management_plan ?? 'company-managed';
         $costService = new BookingCostService();
-        $pkg         = $request->package_id ? Package::find($request->package_id) : null;
         $costResult  = $costService->calculate(
             $request->service_types,
-            $request->package_id,
+            null,
             $managementPlan,
             $request->duration_weeks,
             $request->apartment_type_id
         );
 
-        // Calculate per-session quoted amount for card charge on completion
+        // Calculate per-session quoted amount for card charge on completion.
+        // A one-off is a single live-out session; semi-live-in with a 1-week
+        // duration is still days_per_week sessions, not one.
+        $isOneOff   = $request->duration_weeks === 1 && $request->applicant_type !== 'semi-live-in';
         $services   = HouseService::whereIn('slug', $request->service_types)->get();
         $avgRate    = $services->isNotEmpty() ? $services->avg('hourly_rate') : 14.0;
         $sessHours  = $request->applicant_type === 'semi-live-in' ? 10 : ($request->hours_per_session ?? 3);
-        $daysPerWk  = $pkg?->days_per_week ?? 1;
-        $totalSessions = $request->duration_weeks === 1 ? 1 : ($daysPerWk * $request->duration_weeks);
+        $totalSessions = $isOneOff ? 1 : ($daysPerWk * $request->duration_weeks);
         $quotedPence = (int) round($avgRate * $sessHours * $totalSessions * 100);
 
         // pay_rate is a display-only field (e.g. "£14.00/hr") — cost_breakdown's
@@ -112,8 +118,8 @@ class BookingController extends Controller
             'start_date'         => $request->start_date,
             'end_date'           => $request->end_date,
             'duration_weeks'     => $request->duration_weeks,
-            'package_name'       => $pkg?->name,
-            'days_per_week'      => $pkg?->days_per_week,
+            'package_name'       => null,
+            'days_per_week'      => $daysPerWk,
             'service_days'       => $request->service_days,
             'working_hour_start' => $request->working_hour_start,
             'working_hour_end'   => $request->working_hour_end,
@@ -158,6 +164,24 @@ class BookingController extends Controller
 
         $booking->update(['status' => 'cancelled']);
         return response()->json(['message' => 'Booking cancelled.']);
+    }
+
+    public function destroy(Request $request, ServiceRequest $booking)
+    {
+        if ($booking->client_id !== $request->user()->id) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        // Only a cancelled booking can be removed — active/open/completed
+        // bookings stay for records and to protect in-flight work.
+        if ($booking->status !== 'cancelled') {
+            return response()->json(['message' => 'Only cancelled bookings can be deleted.'], 422);
+        }
+
+        // Applications, ratings and payments cascade-delete with the booking.
+        $booking->delete();
+
+        return response()->json(['message' => 'Booking deleted.']);
     }
 
     public function confirm(Request $request, ServiceRequest $booking, $applicantId)

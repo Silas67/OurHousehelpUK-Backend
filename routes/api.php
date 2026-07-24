@@ -34,11 +34,15 @@ Route::post('/register/applicant', [RegisterController::class, 'applicant'])->mi
 Route::post('/forgot-password', [PasswordResetController::class, 'sendLink'])->middleware('throttle:6,1');
 Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:6,1');
 
-// Public — needed before login to populate the booking form
+// Public — needed before login to populate the booking form and let guests
+// browse the marketplace. Staff endpoints reuse the same controller methods
+// (they return only vetted, public-safe data and don't read the auth user).
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/packages', [PackageController::class, 'index']);
     Route::get('/pricing-data', [PricingController::class, 'pricingData']);
     Route::post('/cost-estimate', [PricingController::class, 'estimate']);
+    Route::get('/public/available-staff', [StaffController::class, 'index']);
+    Route::get('/public/staff/{staff}', [StaffController::class, 'publicShow']);
 });
 
 // Any authenticated user: profile, notifications, logout
@@ -63,6 +67,7 @@ Route::middleware(['auth:sanctum', 'account_type:client'])->group(function () {
     Route::get('/client/bookings', [BookingController::class, 'index']);
     Route::post('/client/bookings', [BookingController::class, 'store']);
     Route::get('/client/bookings/{booking}', [BookingController::class, 'show']);
+    Route::delete('/client/bookings/{booking}', [BookingController::class, 'destroy']);
     Route::post('/client/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
     Route::post('/client/bookings/{booking}/confirm/{applicantId}', [BookingController::class, 'confirm']);
     Route::post('/client/bookings/{booking}/activate', [BookingController::class, 'activate']);
