@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\HouseService;
 use App\Models\Payment;
 use App\Models\ServiceRequest;
 use App\Models\User;
@@ -51,11 +52,13 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        // quoted_pence is computed at booking creation from the actual
-        // house_services.hourly_rate figures — cost_breakdown comes from a
-        // separate, unused pricing engine where every base_cost is £0 and
-        // would always produce a non-payable amount here.
+        // Prefer the amount stored at booking creation, but recompute from the
+        // booking's own fields if it's missing or zero (older bookings, or any
+        // created before the amount was computed) so checkout never dead-ends.
         $amountPence = (int) ($booking->quoted_pence ?? 0);
+        if ($amountPence <= 0) {
+            $amountPence = $this->amountPenceFor($booking);
+        }
 
         if ($amountPence <= 0) {
             return response()->json(['message' => 'Booking has no payable amount.'], 422);
@@ -100,6 +103,21 @@ class PaymentController extends Controller
             'checkout_url' => $session->url,
             'session_id'   => $session->id,
         ]);
+    }
+
+    /** Recompute the charge from a booking's fields — mirrors BookingController::store. */
+    private function amountPenceFor(ServiceRequest $booking): int
+    {
+        $services  = HouseService::whereIn('slug', $booking->service_types ?? [])->get();
+        $avgRate   = $services->isNotEmpty() ? $services->avg('hourly_rate') : 14.0;
+        $sessHours = $booking->applicant_type === 'semi-live-in'
+            ? 10
+            : ((float) $booking->hours_per_session ?: 3);
+        $daysPerWk = max(1, (int) ($booking->days_per_week ?? 1));
+        $isOneOff  = (int) $booking->duration_weeks === 1 && $booking->applicant_type !== 'semi-live-in';
+        $totalSessions = $isOneOff ? 1 : ($daysPerWk * (int) $booking->duration_weeks);
+
+        return (int) round($avgRate * $sessHours * $totalSessions * 100);
     }
 
     /**
